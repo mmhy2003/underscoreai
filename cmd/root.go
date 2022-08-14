@@ -4,19 +4,23 @@ Copyright © 2022 Mohamed Hammad Youssef mmhy2003@hotmail.com
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
+	"github.com/manifoldco/promptui"
 	"github.com/mmhy2003/underscoreai/config"
 	"github.com/spf13/cobra"
 )
 
-const HFAPIENDPOINT = "https://api-inference.huggingface.co/models/bigscience/bloom"
+const HFAPIEndpoint = "https://api-inference.huggingface.co/models/bigscience/bloom"
+const ShellToUse = "bash"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -28,8 +32,22 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) != 0 {
 			prompt := strings.Join(args, " ")
-			result := GetResult(prompt)
-			fmt.Println(ProcessResult(result, prompt))
+			preresult := GetResult(prompt)
+			result := ProcessResult(preresult, prompt)
+			fmt.Println(result)
+
+			pui := promptui.Select{
+				Label: "Execute",
+				Items: []string{"Yes", "No"},
+			}
+			_, cmdResult, err := pui.Run()
+			if err != nil {
+				log.Fatalf("Prompt failed %v\n", err)
+				return
+			}
+			if cmdResult == "Yes" {
+				RunCommand(result)
+			}
 		}
 	},
 }
@@ -131,7 +149,7 @@ func GetResult(prompt string) HFResult {
 
 	req, err := http.NewRequest(
 		http.MethodPost,
-		HFAPIENDPOINT,
+		HFAPIEndpoint,
 		strings.NewReader(string(jsonData)),
 	)
 	if err != nil {
@@ -192,4 +210,23 @@ func ProcessResult(result HFResult, prompt string) string {
 	lastElementPortion = strings.TrimPrefix(lastElementPortion, "A: ")
 
 	return lastElementPortion
+}
+
+func ShellOut(command string) (error, string, string) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := exec.Command(ShellToUse, "-c", command)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return err, stdout.String(), stderr.String()
+}
+
+func RunCommand(command string) {
+	err, stdout, stderr := ShellOut(command)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(stdout)
+	fmt.Println(stderr)
 }
