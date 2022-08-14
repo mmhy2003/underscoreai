@@ -65,12 +65,16 @@ type OptionsStruct struct {
 }
 
 type ParametersStruct struct {
-	DoSample         bool    `json:"do_sample,omitempty"`
-	ReturnFullText   bool    `json:"return_full_text,omitempty"`
-	Temperature      float64 `json:"temperature,omitempty"`
-	MaxLength        int     `json:"max_length,omitempty"`
-	MaxNewTokens     int     `json:"max_new_tokens,omitempty"`
-	StoppingCriteria string  `json:"stopping_criteria,omitempty"`
+	MaxNewTokens      int     `json:"max_new_tokens,omitempty"`
+	TopK              float32 `json:"top_k,omitempty"`
+	TopP              float32 `json:"top_p,omitempty"`
+	Temperature       float32 `json:"temperature,omitempty"`
+	DoSample          bool    `json:"do_sample,omitempty"`
+	Seed              int     `json:"seed,omitempty"`
+	EarlyStopping     bool    `json:"early_stopping,omitempty"`
+	NoRepeatNgramSize int     `json:"no_repeat_ngram_size,omitempty"`
+	NumBeams          int     `json:"num_beams,omitempty"`
+	ReturnFullText    bool    `json:"return_full_text,omitempty"`
 }
 
 type RequestStruct struct {
@@ -103,10 +107,16 @@ func GetResult(prompt string) HFResult {
 	data := RequestStruct{
 		Inputs: finalPrompt,
 		Parameters: ParametersStruct{
-			Temperature:      0.3,
-			MaxLength:        100,
-			MaxNewTokens:     64,
-			StoppingCriteria: "...",
+			MaxNewTokens:      32,
+			TopK:              0,
+			TopP:              0.9,
+			Temperature:       0.7,
+			DoSample:          true,
+			Seed:              42,
+			EarlyStopping:     false,
+			NoRepeatNgramSize: 0,
+			NumBeams:          0,
+			ReturnFullText:    false,
 		},
 		Options: OptionsStruct{
 			UseCache:     true,
