@@ -16,8 +16,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// const HFAPIENDPOINT = "https://api-inference.huggingface.co/models/EleutherAI/gpt-j-6B"
-// const HFAPIENDPOINT = "https://api-inference.huggingface.co/models/succinctly/text2image-prompt-generator"
 const HFAPIENDPOINT = "https://api-inference.huggingface.co/models/bigscience/bloom"
 
 // rootCmd represents the base command when called without any subcommands
@@ -28,10 +26,12 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		prompt := strings.Join(args, " ")
-		result := GetResult(prompt)
-		fmt.Println(ProcessResult(result))
-		// fmt.Println(result.GeneratedText)
+		if len(args) != 0 {
+			prompt := strings.Join(args, " ")
+			result := GetResult(prompt)
+			fmt.Println(ProcessResult(result))
+			// fmt.Println(result.GeneratedText)
+		}
 	},
 }
 
@@ -87,14 +87,6 @@ func LoadPromptContext() string {
 		log.Fatal(err)
 	}
 
-	// // split string at ...
-	// var promptContextStr = strings.Split(string(promptContext), "...")
-
-	// // remove new-line character from beginning and end of promptContextStr
-	// for i := 0; i < len(promptContextStr); i++ {
-	// 	promptContextStr[i] = strings.Trim(promptContextStr[i], "\n")
-	// }
-
 	promptContextStr := string(promptContext)
 
 	return promptContextStr
@@ -109,11 +101,9 @@ func GetResult(prompt string) HFResult {
 	data := RequestStruct{
 		Inputs: finalPrompt,
 		Parameters: ParametersStruct{
-			DoSample:         false,
-			ReturnFullText:   false,
 			Temperature:      0.3,
 			MaxLength:        100,
-			MaxNewTokens:     0,
+			MaxNewTokens:     64,
 			StoppingCriteria: "...",
 		},
 		Options: OptionsStruct{
