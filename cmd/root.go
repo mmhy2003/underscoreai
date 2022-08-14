@@ -94,7 +94,7 @@ func LoadPromptContext() string {
 func GetResult(prompt string) HFResult {
 	// load prompt context
 	var promptContext = LoadPromptContext()
-	newPrompt := "...\nP: " + prompt + "\nA:"
+	newPrompt := "P: " + prompt + "\nA:"
 	finalPrompt := promptContext + newPrompt
 
 	data := RequestStruct{
