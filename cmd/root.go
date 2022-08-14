@@ -29,8 +29,7 @@ var rootCmd = &cobra.Command{
 		if len(args) != 0 {
 			prompt := strings.Join(args, " ")
 			result := GetResult(prompt)
-			fmt.Println(ProcessResult(result))
-			// fmt.Println(result.GeneratedText)
+			fmt.Println(ProcessResult(result, prompt))
 		}
 	},
 }
@@ -150,12 +149,25 @@ func GetResult(prompt string) HFResult {
 	return result
 }
 
-func ProcessResult(result HFResult) string {
+func ProcessResult(result HFResult, prompt string) string {
 	// split result.GeneratedText at ...
 	var resultStr = strings.Split(result.GeneratedText, "...")
 
+	// get index of prompt in resultStr
+	promptIndex := -1
+	for i, v := range resultStr {
+		if strings.Contains(v, prompt) {
+			resultStr = resultStr[i:]
+			promptIndex = i
+			break
+		}
+	}
+	if promptIndex == -1 {
+		log.Fatal("prompt not found in result")
+	}
+
 	// get last element of resultStr
-	var lastElement = resultStr[len(resultStr)-2]
+	var lastElement = resultStr[0]
 
 	// remove new-line character from beginning and end of lastElement
 	lastElement = strings.Trim(lastElement, "\n")

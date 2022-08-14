@@ -1,15 +1,4 @@
-P: Show the manual page for the 'ls' command
-A: man ls
-...
-P: Search for 'search' in manual page
-A: man -k search
-...
-P: Shows the location of the command 'ls' command
-A: which ls
-...
-P: Show help for the command 'ls'
-A: ls --help
-...
+#Bash Commands#
 P: Edit the file '/etc/motd' in nano editor
 A: sudo nano /etc/motd
 ...
