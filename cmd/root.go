@@ -97,6 +97,9 @@ func GetResult(prompt string) HFResult {
 	newPrompt := "P: " + prompt + "\nA:"
 	finalPrompt := promptContext + newPrompt
 
+	// replace all \r\n with \n
+	finalPrompt = strings.Replace(finalPrompt, "\r\n", "\n", -1)
+
 	data := RequestStruct{
 		Inputs: finalPrompt,
 		Parameters: ParametersStruct{
