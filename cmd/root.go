@@ -4,21 +4,23 @@ Copyright © 2022 Mohamed Hammad Youssef mmhy2003@hotmail.com
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
+	"github.com/manifoldco/promptui"
 	"github.com/mmhy2003/underscoreai/config"
 	"github.com/spf13/cobra"
 )
 
-// const HFAPIENDPOINT = "https://api-inference.huggingface.co/models/EleutherAI/gpt-j-6B"
-// const HFAPIENDPOINT = "https://api-inference.huggingface.co/models/succinctly/text2image-prompt-generator"
-const HFAPIENDPOINT = "https://api-inference.huggingface.co/models/bigscience/bloom"
+const HFAPIEndpoint = "https://api-inference.huggingface.co/models/bigscience/bloom"
+const ShellToUse = "bash"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -28,10 +30,25 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		prompt := strings.Join(args, " ")
-		result := GetResult(prompt)
-		fmt.Println(ProcessResult(result))
-		// fmt.Println(result.GeneratedText)
+		if len(args) != 0 {
+			prompt := strings.Join(args, " ")
+			preresult := GetResult(prompt)
+			result := ProcessResult(preresult, prompt)
+			fmt.Println(result)
+
+			pui := promptui.Select{
+				Label: "Execute",
+				Items: []string{"Yes", "No"},
+			}
+			_, cmdResult, err := pui.Run()
+			if err != nil {
+				log.Fatalf("Prompt failed %v\n", err)
+				return
+			}
+			if cmdResult == "Yes" {
+				RunCommand(result)
+			}
+		}
 	},
 }
 
@@ -66,12 +83,16 @@ type OptionsStruct struct {
 }
 
 type ParametersStruct struct {
-	DoSample         bool    `json:"do_sample,omitempty"`
-	ReturnFullText   bool    `json:"return_full_text,omitempty"`
-	Temperature      float64 `json:"temperature,omitempty"`
-	MaxLength        int     `json:"max_length,omitempty"`
-	MaxNewTokens     int     `json:"max_new_tokens,omitempty"`
-	StoppingCriteria string  `json:"stopping_criteria,omitempty"`
+	MaxNewTokens      int     `json:"max_new_tokens,omitempty"`
+	TopK              float32 `json:"top_k,omitempty"`
+	TopP              float32 `json:"top_p,omitempty"`
+	Temperature       float32 `json:"temperature,omitempty"`
+	DoSample          bool    `json:"do_sample,omitempty"`
+	Seed              int     `json:"seed,omitempty"`
+	EarlyStopping     bool    `json:"early_stopping,omitempty"`
+	NoRepeatNgramSize int     `json:"no_repeat_ngram_size,omitempty"`
+	NumBeams          int     `json:"num_beams,omitempty"`
+	ReturnFullText    bool    `json:"return_full_text,omitempty"`
 }
 
 type RequestStruct struct {
@@ -87,14 +108,6 @@ func LoadPromptContext() string {
 		log.Fatal(err)
 	}
 
-	// // split string at ...
-	// var promptContextStr = strings.Split(string(promptContext), "...")
-
-	// // remove new-line character from beginning and end of promptContextStr
-	// for i := 0; i < len(promptContextStr); i++ {
-	// 	promptContextStr[i] = strings.Trim(promptContextStr[i], "\n")
-	// }
-
 	promptContextStr := string(promptContext)
 
 	return promptContextStr
@@ -103,19 +116,25 @@ func LoadPromptContext() string {
 func GetResult(prompt string) HFResult {
 	// load prompt context
 	var promptContext = LoadPromptContext()
-	newPrompt := "...\nP: " + prompt + "\nA:"
-	// finalPrompt := append(promptContext, newPrompt)
+	newPrompt := "P: " + prompt + "\nA:"
 	finalPrompt := promptContext + newPrompt
+
+	// replace all \r\n with \n
+	finalPrompt = strings.Replace(finalPrompt, "\r\n", "\n", -1)
 
 	data := RequestStruct{
 		Inputs: finalPrompt,
 		Parameters: ParametersStruct{
-			DoSample:         false,
-			ReturnFullText:   false,
-			Temperature:      0.3,
-			MaxLength:        100,
-			MaxNewTokens:     0,
-			StoppingCriteria: "...",
+			MaxNewTokens:      32,
+			TopK:              0,
+			TopP:              0.9,
+			Temperature:       0.7,
+			DoSample:          true,
+			Seed:              42,
+			EarlyStopping:     false,
+			NoRepeatNgramSize: 0,
+			NumBeams:          0,
+			ReturnFullText:    false,
 		},
 		Options: OptionsStruct{
 			UseCache:     true,
@@ -130,7 +149,7 @@ func GetResult(prompt string) HFResult {
 
 	req, err := http.NewRequest(
 		http.MethodPost,
-		HFAPIENDPOINT,
+		HFAPIEndpoint,
 		strings.NewReader(string(jsonData)),
 	)
 	if err != nil {
@@ -161,12 +180,25 @@ func GetResult(prompt string) HFResult {
 	return result
 }
 
-func ProcessResult(result HFResult) string {
+func ProcessResult(result HFResult, prompt string) string {
 	// split result.GeneratedText at ...
 	var resultStr = strings.Split(result.GeneratedText, "...")
 
+	// get index of prompt in resultStr
+	promptIndex := -1
+	for i, v := range resultStr {
+		if strings.Contains(v, prompt) {
+			resultStr = resultStr[i:]
+			promptIndex = i
+			break
+		}
+	}
+	if promptIndex == -1 {
+		log.Fatal("prompt not found in result")
+	}
+
 	// get last element of resultStr
-	var lastElement = resultStr[len(resultStr)-2]
+	var lastElement = resultStr[0]
 
 	// remove new-line character from beginning and end of lastElement
 	lastElement = strings.Trim(lastElement, "\n")
@@ -178,4 +210,23 @@ func ProcessResult(result HFResult) string {
 	lastElementPortion = strings.TrimPrefix(lastElementPortion, "A: ")
 
 	return lastElementPortion
+}
+
+func ShellOut(command string) (error, string, string) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := exec.Command(ShellToUse, "-c", command)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return err, stdout.String(), stderr.String()
+}
+
+func RunCommand(command string) {
+	err, stdout, stderr := ShellOut(command)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(stdout)
+	fmt.Println(stderr)
 }

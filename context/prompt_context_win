@@ -1,0 +1,13 @@
+#Powershell Commands#
+P: Display help information about the command Format-Table
+A: Get-Help Format-Table
+...
+P: Get all services that begin with "vm"
+A: Get-Service "vm*"
+...
+P: Get members of the "vm" processes
+A: Get-Service "vm*" | Get-Member
+...
+P: Create a Folder 'X:\Guru99'
+A: New-Item -Path X:\Guru99 -Type Directory
+...
